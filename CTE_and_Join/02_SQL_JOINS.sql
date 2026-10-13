@@ -494,3 +494,247 @@ LEFT JOIN employee e
     ON p.emp_id = e.emp_id
 GROUP BY p.project_name
 ORDER BY employee_count DESC;
+
+/*==============================================================================
+ JOIN 25: PROJECT-WISE EMPLOYEE COUNT
+==============================================================================*/
+
+SELECT
+    p.project_name,
+    COUNT(DISTINCT e.emp_id) AS employee_count
+FROM employee_project p
+LEFT JOIN employee e
+    ON p.emp_id = e.emp_id
+GROUP BY p.project_name
+ORDER BY employee_count DESC;
+
+/*==============================================================================
+ JOIN 26: JOIN + CASE
+
+ Categorize workload based on project hours.
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    p.project_name,
+    p.hours_worked,
+    CASE
+        WHEN p.hours_worked >= 120 THEN 'High Workload'
+        WHEN p.hours_worked >= 80 THEN 'Medium Workload'
+        WHEN p.hours_worked IS NULL THEN 'Hours Not Available'
+        ELSE 'Low Workload'
+    END AS workload
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id;
+
+/*==============================================================================
+ JOIN 27: JOIN + SALARY CONDITION
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    e.salary,
+    p.project_name
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id
+WHERE e.salary > 60000;
+
+/*==============================================================================
+ JOIN 27: JOIN + SALARY CONDITION
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    e.salary,
+    p.project_name
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id
+WHERE e.salary > 60000;
+
+
+/*==============================================================================
+ JOIN 28: JOIN + SUBQUERY
+
+ Find employees working on projects whose hours are above the
+ average project-assignment hours.
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    p.project_name,
+    p.hours_worked
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id
+WHERE p.hours_worked >
+(
+    SELECT AVG(hours_worked)
+    FROM employee_project
+);
+
+/*==============================================================================
+ JOIN 29: JOIN + ANALYTIC FUNCTION
+
+ Rank employees based on project hours.
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    p.project_name,
+    p.hours_worked,
+    RANK() OVER
+    (
+        ORDER BY p.hours_worked DESC NULLS LAST
+    ) AS hours_rank
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id;
+
+
+/*==============================================================================
+ JOIN 30: RANK PROJECTS WITHIN EACH EMPLOYEE
+
+ ROW_NUMBER() gives numbering for each employee's projects.
+==============================================================================*/
+
+SELECT
+    e.emp_id,
+    e.emp_name,
+    p.project_name,
+    p.hours_worked,
+
+    ROW_NUMBER() OVER
+    (
+        PARTITION BY e.emp_id
+        ORDER BY p.hours_worked DESC NULLS LAST
+    ) AS project_rank
+
+FROM employee e
+JOIN employee_project p
+    ON e.emp_id = p.emp_id
+ORDER BY e.emp_id, project_rank;
+
+
+/*==============================================================================
+ EXTRA JOIN 31: HIGHEST-HOURS PROJECT FOR EACH EMPLOYEE
+==============================================================================*/
+
+SELECT
+    emp_id,
+    emp_name,
+    project_name,
+    hours_worked
+FROM
+(
+    SELECT
+        e.emp_id,
+        e.emp_name,
+        p.project_name,
+        p.hours_worked,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY e.emp_id
+            ORDER BY p.hours_worked DESC NULLS LAST
+        ) AS rn
+
+    FROM employee e
+    JOIN employee_project p
+        ON e.emp_id = p.emp_id
+)
+WHERE rn = 1;
+
+/*==============================================================================
+ EXTRA JOIN 32: EMPLOYEE + MANAGER + PROJECT
+
+ Three logical entities using employee table twice.
+==============================================================================*/
+
+SELECT
+    e.emp_name AS employee_name,
+    nvl(m.emp_name,'No Manager') AS manager_name,
+    p.project_name
+FROM employee e
+
+LEFT JOIN employee m
+    ON e.manager_id = m.emp_id
+
+LEFT JOIN employee_project p
+    ON e.emp_id = p.emp_id
+
+ORDER BY e.emp_id;
+
+/*==============================================================================
+ EXTRA JOIN 33: FIND NULL VALUES AFTER JOIN
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+    e.salary,
+    e.city,
+    p.project_name,
+    p.project_role,
+    p.hours_worked
+FROM employee e
+LEFT JOIN employee_project p
+    ON e.emp_id = p.emp_id
+WHERE e.salary IS NULL
+   OR e.city IS NULL
+   OR p.project_role IS NULL
+   OR p.hours_worked IS NULL;
+
+/*==============================================================================
+ EXTRA JOIN 34: NVL FOR MULTIPLE NULL COLUMNS
+==============================================================================*/
+
+SELECT
+    e.emp_name,
+
+    NVL(e.department, 'Department Not Assigned')
+        AS department,
+
+    NVL(e.city, 'City Not Available')
+        AS city,
+
+    NVL(p.project_name, 'No Project')
+        AS project_name,
+
+    NVL(p.project_role, 'Role Not Assigned')
+        AS project_role,
+
+    NVL(p.hours_worked, 0)
+        AS hours_worked
+
+FROM employee e
+LEFT JOIN employee_project p
+    ON e.emp_id = p.emp_id;
+
+/*==============================================================================
+ EXTRA JOIN 35: DEPARTMENT-WISE PROJECT ASSIGNMENTS
+==============================================================================*/
+
+SELECT
+    e.department,
+    COUNT(p.assignment_id) AS project_assignments,
+    SUM(NVL(p.hours_worked,0)) AS total_hours
+FROM employee e
+LEFT JOIN employee_project p
+    ON e.emp_id = p.emp_id
+GROUP BY e.department
+ORDER BY project_assignments DESC;
+
+/*==============================================================================
+ EXTRA JOIN 36: PROJECTS HAVING MORE THAN ONE EMPLOYEE
+==============================================================================*/
+
+SELECT
+    p.project_name,
+    COUNT(DISTINCT p.emp_id) AS employee_count
+FROM employee_project p
+JOIN employee e
+on p.emp_id = e.EMP_ID
+group by p.project_name
+having employee_count > 1
